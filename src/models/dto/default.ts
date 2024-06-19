@@ -1,7 +1,7 @@
 interface DefaultResponse {
-    status: string;
-    message: string;
-    data: any;
-  }
-  
-  export { DefaultResponse };
+  status: string;
+  message: string;
+  data: any;
+}
+
+export { DefaultResponse };

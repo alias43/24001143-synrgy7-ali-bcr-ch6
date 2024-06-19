@@ -1,13 +1,12 @@
 import { Request, Response } from "express";
 import { DefaultResponse } from "../models/dto/default";
 import { Car } from "../models/entity/car";
-import { CarRequest } from "../models/dto/car";
+import { CarRequest, CarResponse } from "../models/dto/car";
 import CarsService from "../services/cars";
-import cloudinary from "../../config/cloudinary";
 
 class CarsHandler {
   async getCars(req: Request, res: Response) {
-    const carsList: Car[] = await CarsService.getCars();
+    const carsList: CarResponse[] = await CarsService.getCars();
 
     const response: DefaultResponse = {
       status: "OK",
@@ -46,11 +45,12 @@ class CarsHandler {
   async createCar(req: Request, res: Response) {
     const payload: CarRequest = req.body;
     payload.car_img = req.file;
-
+    payload.create_at = new Date();
+    payload.create_by = req.user.id as number;
     if (
       !(
         payload.car_name &&
-        payload.car_rentPerDay &&
+        payload.car_rentperday &&
         payload.car_size &&
         payload.car_img
       )
@@ -65,6 +65,8 @@ class CarsHandler {
 
       return res.status(400).send(response);
     }
+
+    console.log("payload createcar :", payload);
 
     const createdCar: Car = await CarsService.createCar(payload);
 
@@ -81,7 +83,12 @@ class CarsHandler {
 
   async deleteCarById(req: Request, res: Response) {
     const queryId: number = parseInt(req.params.id);
-    const deletedCar: Car | null = await CarsService.deleteCarById(queryId);
+    const deletedBy = req.user.id as number; // Menggunakan ID pengguna dari data pengguna yang diautentikasi
+    const deletedCar: Car | null = await CarsService.deleteCarById(
+      queryId,
+      deletedBy
+    );
+    console.log(queryId, deletedBy);
 
     if (!deletedCar) {
       const Response: DefaultResponse = {
@@ -107,30 +114,45 @@ class CarsHandler {
     const queryId: number = parseInt(req.params.id);
     const payload: CarRequest = req.body;
     payload.car_img = req.file;
-    console.log(payload);
+    payload.update_at = new Date();
+    payload.update_by = req.user.id as number;
 
     // Payload validation
     if (
       !(
         payload.car_name &&
-        payload.car_rentPerDay &&
+        payload.car_rentperday &&
         payload.car_size &&
         payload.car_img
       )
     ) {
       const response: DefaultResponse = {
         status: "BAD_REQUEST",
-        message: "fiedls cannot be empty",
+        message: "fields cannot be empty",
         data: {
           updated_car: null,
         },
       };
-      res.status(400).send(response);
+      return res.status(400).send(response);
     }
+
+    console.log(payload);
     const updatedCar: Car | null = await CarsService.updateCarById(
       queryId,
       payload
     );
+    const payloadUser = {
+      car_name: payload.car_name,
+      car_rentperday: payload.car_rentperday,
+      car_size: payload.car_size,
+      car_img: updatedCar?.car_img,
+      create_by: updatedCar?.create_by,
+      update_by: payload.update_by,
+      delete_by: updatedCar?.delete_by,
+      create_at: updatedCar?.create_at,
+      update_at: payload.update_at,
+      delete_at: updatedCar?.delete_at,
+    };
 
     if (!updatedCar) {
       const Response: DefaultResponse = {
@@ -145,10 +167,11 @@ class CarsHandler {
       status: "UPDATED",
       message: "Car successfully updated",
       data: {
-        update_car: updatedCar,
+        old_data: updatedCar,
+        new_data: payloadUser,
       },
     };
-    res.status(200).send(response);
+    return res.status(200).send(response);
   }
 }
 
